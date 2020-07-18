@@ -6,6 +6,7 @@ const path = require("path");
 const PORT = process.env.PORT || 3000;
 
 const db = require("./models");
+const { json } = require("express");
 
 const app = express();
 
@@ -17,11 +18,19 @@ app.use(express.json());
 app.use(express.static("public"));
 
 
-mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost/workout", { useNewUrlParser: true });
+mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost/workout", { useNewUrlParser: true, useFindAndModify: false });
 
 app.get("/api/workouts", (req, res) => {
-  db.Workout.find({})
-    .populate("exercises")
+  db.Workout.aggregate([
+      {$sort :{ day : -1}},
+      { $limit : 1 },
+      {$addFields: {totalDuration:{
+                      $reduce: {
+                                input: "$exercises",
+                                initialValue: 0,
+                                in: {$add : ["$$value", "$$this.duration"]}
+                                }} }}
+    ])
     .then(dbWorkout => {
       res.json(dbWorkout);
     })
@@ -30,9 +39,26 @@ app.get("/api/workouts", (req, res) => {
     });
 });
 
+
+app.get("/api/workouts/range", (req, res) => {
+    db.Workout.find({}).limit(7)
+      .then(dbWorkout => {
+        res.json(dbWorkout);
+      })
+      .catch(err => {
+        res.json(err);
+      });
+  });
+
+
 app.post("/api/workouts", ({body}, res) => {
-    db.Workout.create(body)
+    let newWorkout = {
+      day: new Date().setDate(new Date().getDate()),
+      exercises: []
+    }
+    db.Workout.create(newWorkout)
     .then(dbWorkout => {
+      console.log(`New Workout Added`, dbWorkout);
       res.json(dbWorkout);
     })
     .catch(err => {
@@ -42,8 +68,7 @@ app.post("/api/workouts", ({body}, res) => {
 
 app.put("/api/workouts/:workoutId", (req, res) => {
     newExercise = req.body;
-    db.Exercise.create(newExercise)
-    .then(({ _id }) => db.Workout.findOneAndUpdate({_id: ObjectId(req.params.workoutId)}, { $push: { exercises: _id } }, { new: true }))
+    db.Workout.findOneAndUpdate({_id: req.params.workoutId}, { $push: { exercises: newExercise } }, { new: true })
     .then(dbWorkout => {
       res.json(dbWorkout);
     })
@@ -51,22 +76,6 @@ app.put("/api/workouts/:workoutId", (req, res) => {
       res.json(err);
     });
 });
-
-// app.get("/populateduser", (req, res) => {
-//   // TODO
-//   // =====
-//   // Write the query to grab the documents from the User collection,
-//   // and populate them with any associated Notes.
-//   // TIP: Check the models out to see how the Notes refers to the User
-//   db.User.find({})
-//   .populate("notes")
-//   .then(dbUser => {
-//     res.json(dbUser);
-//   })
-//   .catch(err => {
-//     res.json(err);
-//   });
-// });
 
 app.get("/exercise", (req, res) => {
     res.sendFile(path.join(__dirname, "public/exercise.html"));
