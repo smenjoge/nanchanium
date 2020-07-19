@@ -9,7 +9,7 @@ fetch("/api/workouts/range")
   });
 
 
-API.getWorkoutsInRange()
+// API.getWorkoutsInRange()
 
   function generatePalette() {
     const arr = [
@@ -190,9 +190,11 @@ function duration(data) {
   let durations = [];
 
   data.forEach(workout => {
+    let exerciseDuration = 0;
     workout.exercises.forEach(exercise => {
-      durations.push(exercise.duration);
+      exerciseDuration += (exercise.duration || 0)
     });
+    durations.push(exerciseDuration);
   });
 
   return durations;
@@ -202,9 +204,11 @@ function calculateTotalWeight(data) {
   let total = [];
 
   data.forEach(workout => {
+    let exerciseWeight = 0;
     workout.exercises.forEach(exercise => {
-      total.push(exercise.weight);
+      exerciseWeight += (exercise.weight || 0);
     });
+    total.push(exerciseWeight);
   });
 
   return total;
